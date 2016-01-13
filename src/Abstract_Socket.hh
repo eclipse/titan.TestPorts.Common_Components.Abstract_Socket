@@ -21,7 +21,7 @@
 //
 //  File:               Abstract_Socket.hh
 //  Description:        Abstract_Socket header file
-//  Rev:                R7G
+//  Rev:                R8C
 //  Prodnr:             CNL 113 384
 //
 
@@ -363,12 +363,24 @@ protected:
   virtual const char* ssl_password_name();
   virtual const char* ssl_cipher_list_name();
   virtual const char* ssl_verifycertificate_name();
+  virtual const char* ssl_disable_SSLv2();
+  virtual const char* ssl_disable_SSLv3();
+  virtual const char* ssl_disable_TLSv1();
+  virtual const char* ssl_disable_TLSv1_1();
+  virtual const char* ssl_disable_TLSv1_2();
 
 private:
   bool ssl_verify_certificate;     // verify other part's certificate or not
   bool ssl_use_ssl;                // whether to use SSL
   bool ssl_initialized;            // whether SSL already initialized or not
   bool ssl_use_session_resumption; // use SSL sessions or not
+
+  bool SSLv2;
+  bool SSLv3;
+  bool TLSv1;
+  bool TLSv1_1;
+  bool TLSv1_2;
+
 
   char *ssl_key_file;              // private key file
   char *ssl_certificate_file;      // own certificate file

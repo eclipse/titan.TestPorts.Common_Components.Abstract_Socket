@@ -21,7 +21,7 @@
 //
 //  File:               Abstract_Socket.cc
 //  Description:        Abstract_Socket implementation file
-//  Rev:                R7G
+//  Rev:                R8C
 //  Prodnr:             CNL 113 384
 //
 
@@ -886,7 +886,7 @@ int Abstract_Socket::open_listen_port(const char* localHostname, const char* loc
   }
   char			hname[NI_MAXHOST];
   char			sname[NI_MAXSERV];
-  error = getnameinfo(res->ai_addr, res->ai_addrlen,
+/*  error = getnameinfo(res->ai_addr, res->ai_addrlen,
       hname, sizeof (hname), sname, sizeof (sname), NI_NUMERICSERV);
   if (error) {
     close(listen_fd);
@@ -902,7 +902,7 @@ int Abstract_Socket::open_listen_port(const char* localHostname, const char* loc
   } else {
  	  log_debug("Listening on (name): %s/%s\n",
  	      hname, sname);
-  }
+  }*/
   error = getnameinfo(res->ai_addr, res->ai_addrlen,
       hname, sizeof (hname), sname, sizeof (sname), NI_NUMERICHOST|NI_NUMERICSERV);
   if (error) {
@@ -1360,7 +1360,7 @@ int Abstract_Socket::open_client_connection(const char* remoteHostname, const ch
     }
     char			hname[NI_MAXHOST];
     char			sname[NI_MAXSERV];
-    error = getnameinfo(aip->ai_addr, aip->ai_addrlen,
+/*    error = getnameinfo(aip->ai_addr, aip->ai_addrlen,
         hname, sizeof (hname), sname, sizeof (sname), NI_NUMERICSERV);
     if (error) {
       close(socket_fd);
@@ -1375,18 +1375,19 @@ int Abstract_Socket::open_client_connection(const char* remoteHostname, const ch
       log_debug("Connection established (name): %s/%s -> %s/%s\n",
           hname, sname,
           remoteHostname, remoteServicename);
-    }
+    }*/
     error = getnameinfo(aip->ai_addr, aip->ai_addrlen,
         hname, sizeof (hname), sname, sizeof (sname), NI_NUMERICHOST|NI_NUMERICSERV);
     if (error) {
-      close(socket_fd);
+/*      close(socket_fd);
       if(use_connection_ASPs)
       {
         log_warning("getnameinfo() system call failed on the client socket when trying to connect to server: %s", gai_strerror(error));
-        client_connection_opened(-1);
-        return -1;
+//        client_connection_opened(-1);
+//        return -1;
       }
-      else log_error("getnameinfo() system call failed on the client socket when trying to connect to server: %s", gai_strerror(error));
+      else*/
+       log_warning("getnameinfo() system call failed on the client socket when trying to connect to server: %s", gai_strerror(error));
     } else {
       log_debug("Connection established (addr): %s/%s -> %s/%s\n",
           hname, sname,
@@ -1964,6 +1965,11 @@ SSL_Socket::SSL_Socket()
   test_port_name=NULL;
   ssl_ctx = NULL;
   ssl_current_ssl = NULL;
+  SSLv2=true;
+  SSLv3=true;
+  TLSv1=true;
+  TLSv1_1=true;
+  TLSv1_2=true;
 }
 
 SSL_Socket::SSL_Socket(const char *tp_type, const char *tp_name)
@@ -1982,6 +1988,11 @@ SSL_Socket::SSL_Socket(const char *tp_type, const char *tp_name)
   test_port_name=tp_name;
   ssl_ctx = NULL;
   ssl_current_ssl = NULL;
+  SSLv2=true;
+  SSLv3=true;
+  TLSv1=true;
+  TLSv1_1=true;
+  TLSv1_2=true;
 }
 
 SSL_Socket::~SSL_Socket()
@@ -2034,6 +2045,26 @@ bool SSL_Socket::parameter_set(const char *parameter_name,
     if(strcasecmp(parameter_value, "yes") == 0) ssl_verify_certificate = true;
     else if(strcasecmp(parameter_value, "no") == 0) ssl_verify_certificate = false;
     else log_error("Parameter value '%s' not recognized for parameter '%s'", parameter_value, ssl_verifycertificate_name());
+  } else if(strcasecmp(parameter_name, ssl_disable_SSLv2()) == 0) {
+    if(strcasecmp(parameter_value, "yes") == 0)  SSLv2= false;
+    else if(strcasecmp(parameter_value, "no") == 0) SSLv2 = true;
+    else log_error("Parameter value '%s' not recognized for parameter '%s'", parameter_value, ssl_disable_SSLv2());
+  } else if(strcasecmp(parameter_name, ssl_disable_SSLv3()) == 0) {
+    if(strcasecmp(parameter_value, "yes") == 0) SSLv2 = false;
+    else if(strcasecmp(parameter_value, "no") == 0) SSLv2 = true;
+    else log_error("Parameter value '%s' not recognized for parameter '%s'", parameter_value, ssl_disable_SSLv3());
+  } else if(strcasecmp(parameter_name, ssl_disable_TLSv1()) == 0) {
+    if(strcasecmp(parameter_value, "yes") == 0)  TLSv1= false;
+    else if(strcasecmp(parameter_value, "no") == 0) TLSv1 = true;
+    else log_error("Parameter value '%s' not recognized for parameter '%s'", parameter_value, ssl_disable_TLSv1());
+  } else if(strcasecmp(parameter_name, ssl_disable_TLSv1_1()) == 0) {
+    if(strcasecmp(parameter_value, "yes") == 0) TLSv1_1 = false;
+    else if(strcasecmp(parameter_value, "no") == 0) TLSv1_1 = true;
+    else log_error("Parameter value '%s' not recognized for parameter '%s'", parameter_value, ssl_disable_TLSv1_1());
+  } else if(strcasecmp(parameter_name, ssl_disable_TLSv1_2()) == 0) {
+    if(strcasecmp(parameter_value, "yes") == 0) TLSv1_2 = false;
+    else if(strcasecmp(parameter_value, "no") == 0) TLSv1_2 = true;
+    else log_error("Parameter value '%s' not recognized for parameter '%s'", parameter_value, ssl_disable_TLSv1_2());
   } else {
     log_debug("leaving SSL_Socket::parameter_set(%s, %s)", parameter_name, parameter_value);
     return Abstract_Socket::parameter_set(parameter_name, parameter_value);
@@ -2060,6 +2091,32 @@ bool SSL_Socket::add_user_data(int client_id) {
 
   if (ssl_current_ssl==NULL)
     log_error("Creation of SSL object failed");
+#ifdef SSL_OP_NO_SSLv2
+  if(!SSLv2){
+    SSL_set_options(ssl_current_ssl,SSL_OP_NO_SSLv2);
+  }
+#endif
+#ifdef SSL_OP_NO_SSLv3
+  if(!SSLv3){
+    SSL_set_options(ssl_current_ssl,SSL_OP_NO_SSLv3);
+  }
+#endif
+#ifdef SSL_OP_NO_TLSv1
+  if(!TLSv1){
+    SSL_set_options(ssl_current_ssl,SSL_OP_NO_TLSv1);
+  }
+#endif
+#ifdef SSL_OP_NO_TLSv1_1
+  if(!TLSv1_1){
+    SSL_set_options(ssl_current_ssl,SSL_OP_NO_TLSv1_1);
+  }
+#endif
+#ifdef SSL_OP_NO_TLSv1_2
+  if(!TLSv1_2){
+    SSL_set_options(ssl_current_ssl,SSL_OP_NO_TLSv1_2);
+  }
+#endif
+    
   set_user_data(client_id, ssl_current_ssl);
   log_debug("New client added with key '%d'", client_id);
   log_debug("Binding SSL to the socket");
@@ -2477,6 +2534,11 @@ const char* SSL_Socket::ssl_certificate_file_name()       { return "ssl_certific
 const char* SSL_Socket::ssl_password_name()               { return "ssl_private_key_password";}
 const char* SSL_Socket::ssl_cipher_list_name()            { return "ssl_allowed_ciphers_list";}
 const char* SSL_Socket::ssl_verifycertificate_name()      { return "ssl_verify_certificate";}
+const char* SSL_Socket::ssl_disable_SSLv2()      { return "ssl_disable_SSLv2";}
+const char* SSL_Socket::ssl_disable_SSLv3()      { return "ssl_disable_SSLv3";}
+const char* SSL_Socket::ssl_disable_TLSv1()      { return "ssl_disable_TLSv1";}
+const char* SSL_Socket::ssl_disable_TLSv1_1()      { return "ssl_disable_TLSv1_1";}
+const char* SSL_Socket::ssl_disable_TLSv1_2()      { return "ssl_disable_TLSv1_2";}
 
 
 void SSL_Socket::ssl_actions_to_seed_PRNG() {
@@ -2579,10 +2641,10 @@ void SSL_Socket::ssl_init_SSL()
 
   // check the other side's certificates
   if (ssl_verify_certificate) {
-    log_debug("Setting verification behaviour: verification required and do not allow to continue on failure");
+    log_debug("Setting verification behaviour: verification required and do not allow to continue on failure..");
     SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, ssl_verify_callback);
   } else {
-    log_debug("Setting verification behaviour: verification not required and do allow to continue on failure");
+    log_debug("Setting verification behaviour: verification not required and do allow to continue on failure..");
     SSL_CTX_set_verify(ssl_ctx, SSL_VERIFY_NONE, ssl_verify_callback);
   }
 
@@ -2720,18 +2782,23 @@ int SSL_Socket::ssl_verify_callback(int preverify_ok, X509_STORE_CTX *ssl_ctx)
   ctx_pointer = SSL_get_SSL_CTX(ssl_pointer);
 
   if (ssl_current_client!=NULL) {
-     user_result=((SSL_Socket *)ssl_current_client)->ssl_verify_certificates_at_handshake(preverify_ok, ssl_ctx);
-     if (user_result>=0) return user_result;
+     // if ssl_verifiycertificate == "no", then always accept connections
+     if(((SSL_Socket *)ssl_current_client)->ssl_verify_certificate) {
+       user_result=((SSL_Socket *)ssl_current_client)->ssl_verify_certificates_at_handshake(preverify_ok, ssl_ctx);
+       if (user_result>=0) return user_result;
+     } else {
+       return 1;
+     }
   } else { // go on with default authentication
      fprintf(stderr, "Warning: no current SSL object found but ssl_verify_callback is called, programming error\n");
   }
 
   // if ssl_verifiycertificate == "no", then always accept connections
-  if (SSL_CTX_get_verify_mode(ctx_pointer) && SSL_VERIFY_NONE)
+  if (SSL_CTX_get_verify_mode(ctx_pointer) == SSL_VERIFY_NONE)
     return 1;
   // if ssl_verifiycertificate == "yes", then accept connections only if the
   // certificate is valid
-  else if (SSL_CTX_get_verify_mode(ctx_pointer) && SSL_VERIFY_PEER) {
+  else if (SSL_CTX_get_verify_mode(ctx_pointer) & SSL_VERIFY_PEER) {
     return preverify_ok;
   }
   // something went wrong
