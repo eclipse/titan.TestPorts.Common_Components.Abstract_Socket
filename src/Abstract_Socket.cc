@@ -12,16 +12,16 @@
 *   Balasko Jeno
 *   Zoltan Bibo
 *   Eduard Czimbalmos
-*   Kulcsár Endre
+*   KulcsÃ¡r Endre
 *   Gabor Szalai
 *   Jozsef Gyurusi
-*   Csöndes Tibor
+*   CsÃ¶ndes Tibor
 *   Zoltan Jasz
 ******************************************************************************/
 //
 //  File:               Abstract_Socket.cc
 //  Description:        Abstract_Socket implementation file
-//  Rev:                R8C
+//  Rev:                R9B
 //  Prodnr:             CNL 113 384
 //
 
@@ -316,16 +316,14 @@ void Abstract_Socket::Handle_Socket_Event(int fd, boolean is_readable, boolean i
           } else {
             if(shutdown(fd, SHUT_RD) != 0) {
               if(errno == ENOTCONN) {
-                remove_client(fd);
-                peer_disconnected(fd);
                 errno = 0;
-              } else
+              } else {
                 log_error("shutdown(SHUT_RD) system call failed");
-            } else {
-              client_data->tcp_state = CLOSE_WAIT;
-	      Remove_Fd_Read_Handler(fd);
-              peer_half_closed(fd);
+              }
             }
+            client_data->tcp_state = CLOSE_WAIT;
+            Remove_Fd_Read_Handler(fd);
+            peer_half_closed(fd);
           }
       } // switch (client_data->reading_state)
     } else if (messageLength > 0) {
@@ -465,12 +463,11 @@ int Abstract_Socket::send_message_on_nonblocking_fd(int client_id,
 
     log_debug("entering Abstract_Socket::"
                 "send_message_on_nonblocking_fd(id: %d)", client_id);
-    as_client_struct * client_data;
+    as_client_struct * client_data = get_peer(client_id);
     int sent_len = 0;
     while(sent_len < length){
         int ret;
         log_debug("Abstract_Socket::send_message_on_nonblocking_fd(id: %d): new iteration", client_id);
-        client_data = get_peer(client_id);
         if (client_data->reading_state == STATE_DONT_CLOSE){
             goto client_closed_connection;
         } else ret = send(client_id, send_par + sent_len, length - sent_len, 0);
@@ -1549,11 +1546,19 @@ void Abstract_Socket::send_outgoing(const unsigned char* send_par, int length, i
   nrOfBytesSent = use_non_blocking_socket ? send_message_on_nonblocking_fd(dest_fd, send_par, length) :
                                             send_message_on_fd(dest_fd, send_par, length);
 
-  if (nrOfBytesSent == -1 && errno == EPIPE){  // means connection was interrupted by peer
-    errno = 0;
-    log_debug("Client %d closed connection", client_id);
-    remove_client(dest_fd);
-    peer_disconnected(dest_fd);
+  if (nrOfBytesSent == -1){  
+    log_debug("Client %d closed connection. Error: %d %s", client_id, errno, strerror(errno));
+    report_unsent(dest_fd,length,nrOfBytesSent,send_par,"Client closed the connection");
+    
+    if(client_data->tcp_state == CLOSE_WAIT){
+      log_debug("Client %d waiting for close ASP.", client_id);
+    } else {
+      errno = 0;
+      log_debug("Client %d closed connection", client_id);
+      client_data->tcp_state = CLOSE_WAIT;
+	    Remove_Fd_Read_Handler(dest_fd);
+      peer_half_closed(dest_fd);
+    }
   }else if (nrOfBytesSent != length) {
     char *error_text=mprintf("Send system call failed: %d bytes were sent instead of %d", nrOfBytesSent, length);
     report_error(client_id,length,nrOfBytesSent,send_par,error_text);
@@ -1567,6 +1572,11 @@ void Abstract_Socket::send_outgoing(const unsigned char* send_par, int length, i
 void Abstract_Socket::report_error(int /*client_id*/, int /*msg_length*/, int /*sent_length*/, const unsigned char* /*msg*/, const char* error_text)
 {
   log_error("%s",error_text);
+}
+
+void Abstract_Socket::report_unsent(int /*client_id*/, int /*msg_length*/, int /*sent_length*/, const unsigned char* /*msg*/, const char* error_text)
+{
+  log_debug("%s",error_text);
 }
 
 void Abstract_Socket::all_mandatory_configparameters_present()
@@ -2351,9 +2361,10 @@ int SSL_Socket::send_message_on_fd(int client_id, const unsigned char* send_par,
       log_debug("SSL_ERROR_ZERO_RETURN is received, setting SSL SHUTDOWN mode to QUIET");
       ssl_current_client=NULL;
       log_debug("leaving SSL_Socket::send_message_on_fd()");
-      return 0;
+      return -1;
     default:
-      log_error("SSL error occured");
+      log_debug("SSL error occured");
+      return -1;
     }
   }
   // avoid compiler warnings
@@ -2445,7 +2456,8 @@ int SSL_Socket::send_message_on_nonblocking_fd(int client_id, const unsigned cha
     case SSL_ERROR_ZERO_RETURN:
         goto client_closed_connection;
     default:
-      log_error("SSL error occured");
+      log_warning("SSL error occured");
+      return -1;
     }
   }
 

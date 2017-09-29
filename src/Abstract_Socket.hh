@@ -21,7 +21,7 @@
 //
 //  File:               Abstract_Socket.hh
 //  Description:        Abstract_Socket header file
-//  Rev:                R8C
+//  Rev:                R9B
 //  Prodnr:             CNL 113 384
 //
 
@@ -197,6 +197,8 @@ protected:
   virtual void peer_half_closed(int client_id);
   // Called after a send error
   virtual void report_error(int client_id, int msg_length, int sent_length, const unsigned char* msg, const char* error_text);
+  // Called after a unsent message
+  virtual void report_unsent(int client_id, int msg_length, int sent_length, const unsigned char* msg, const char* error_text);
 
   // Test port parameters
   virtual const char* local_port_name();
